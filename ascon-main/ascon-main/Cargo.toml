@@ -1,0 +1,28 @@
+[package]
+name = "ascon"
+version = "2.0.0"
+edition = "2021"
+rust-version = "1.80.0"
+description = "Strong Ascon-128 file encryptor with aggressive 512 MiB Argon2id KDF — Linux only"
+repository = "https://github.com/YOURNAME/ascon"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["ascon", "aead", "encryption", "lightweight-crypto", "linux"]
+categories = ["cryptography", "command-line-utilities"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1"
+argon2 = { version = "0.5", features = ["std"] }
+ascon-aead = "0.5"
+rand = "0.8"
+zeroize = { version = "1.8", features = ["derive"] }
+rpassword = "7"
+tempfile = "3"
+indicatif = "0.17"
+fs-err = "2"
+hex = "0.4"
+
+# nix is commented out because we removed mlock for now (keeps code 100% safe)
+# [target.'cfg(target_os = "linux")'.dependencies]
+# nix = { version = "0.29", features = ["mman"] }

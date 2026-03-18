@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ascon — Strong Ascon-128 File Encryptor for Linux</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        
+        :root {
+            --bg: #0d1117;
+            --text: #c9d1d9;
+            --accent: #00d4ff;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system_ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+        
+        .container {
+            max-width: 860px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 40px;
+        }
+        
+        h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.2rem;
+            margin: 0 0 12px 0;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .tagline {
+            font-size: 1.35rem;
+            color: var(--accent);
+            font-weight: 500;
+            margin: 0;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: #21262d;
+            color: #8b949e;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            margin-top: 20px;
+        }
+        
+        h2 {
+            color: white;
+            font-size: 1.65rem;
+            margin-top: 48px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 8px;
+        }
+        
+        ul {
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 10px;
+            font-size: 1.05rem;
+        }
+        
+        code {
+            background: #161b22;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: ui-monospace, monospace;
+            font-size: 0.95rem;
+        }
+        
+        pre {
+            background: #161b22;
+            padding: 18px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #30363d;
+        }
+        
+        .warning {
+            background: #2a1f1f;
+            border-left: 4px solid #f85149;
+            padding: 16px 20px;
+            margin: 24px 0;
+            border-radius: 6px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 80px;
+            padding-top: 30px;
+            border-top: 1px solid #30363d;
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+        
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ascon</h1>
+            <p class="tagline">Strong Ascon-128 file encryptor for Linux</p>
+            <div class="badge">v2.0.0 • Linux only</div>
+        </header>
+
+        <p>A simple, fast, and security-first CLI tool that encrypts individual files using <strong>Ascon-128</strong> (NIST Lightweight Cryptography winner) with an extremely strong <strong>Argon2id</strong> key derivation (512 MiB memory hardness).</p>
+
+        <h2>Features</h2>
+        <ul>
+            <li>Ascon-128 AEAD (authenticated encryption)</li>
+            <li>Aggressive Argon2id defaults (512 MiB, 10 iterations, 4 lanes)</li>
+            <li>Password confirmation on encrypt</li>
+            <li><strong>--keyfile</strong> support for non-interactive scripts and hardware tokens</li>
+            <li>Always produces <code>.ascon</code> files (original extension stored inside)</li>
+            <li>Atomic writes + secure permissions (<code>0600</code>)</li>
+            <li><code>--shred</code> option for secure deletion</li>
+            <li><code>info</code> command</li>
+            <li>Sensitive data zeroized from memory</li>
+        </ul>
+
+        <h2>Usage Examples</h2>
+        <pre><code># Normal password mode
+ascon encrypt readme.md
+ascon decrypt readme.ascon
+ascon info readme.ascon
+
+# Encrypt and securely shred original
+ascon encrypt --shred important.txt</code></pre>
+
+        <h2>Keyfile mode (non-interactive / hardware tokens)</h2>
+        <p><strong>--keyfile</strong> (or <code>-k</code>) is a flag you add to <code>encrypt</code> or <code>decrypt</code>.</p>
+
+        <p>The keyfile must be exactly <strong>16 bytes</strong> of raw binary data.</p>
+        
+        <p><strong>Why exactly 16 bytes?</strong> Ascon-128 (the official NIST standard we use) is designed with 128-bit keys. This is intentional and correct — longer keys are not supported in the Ascon-128 AEAD specification.</p>
+
+        <h3>How to create a keyfile</h3>
+        <pre><code># Recommended (uses OpenSSL)
+openssl rand -out KEY.bin 16
+
+# Alternative (using Linux random)
+dd if=/dev/random of=KEY.bin bs=16 count=1 status=none</code></pre>
+
+        <h3>Examples with keyfile</h3>
+        <pre><code># Encrypt without typing a password
+ascon encrypt --keyfile KEY.bin secret.pdf
+
+# Decrypt using the same keyfile
+ascon decrypt --keyfile KEY.bin secret.pdf.ascon
+
+# Combine with shred
+ascon encrypt --keyfile KEY.bin --shred important.txt</code></pre>
+
+        <div class="warning">
+            <strong>Important notes:</strong><br>
+            • Keep your keyfile extremely secure — anyone who has it can decrypt your files.<br>
+            • No independent security audit has been performed yet.<br>
+            • Loads the entire file into RAM (not suitable for huge files).<br>
+            • Linux only.<br>
+            • For full-disk encryption use LUKS or gocryptfs.
+        </div>
+
+        <h2>Installation</h2>
+        <pre><code>cargo install --git https://github.com/YOURNAME/ascon.git</code></pre>
+
+        <footer>
+            <p>License: MIT OR Apache-2.0</p>
+            <p>Made with ❤️ for security-conscious Linux users</p>
+        </footer>
+    </div>
+</body>
+</html>
