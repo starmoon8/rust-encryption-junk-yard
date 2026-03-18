@@ -1,0 +1,16 @@
+[package]
+name = "stardust-keygen"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"  # your exact version, no older support
+description = "Deterministic key generator: password → non-repeating key up to 20GB"
+authors = ["Mark"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+rpassword = "7.3"
+argon2 = "0.5"
+chacha20 = "0.9"
+cipher = "0.4"
+nix = { version = "0.29", features = ["fs", "fcntl"] }

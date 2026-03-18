@@ -1,0 +1,5 @@
+
+# Encrypt with a passphrase (you’ll be prompted to enter one; leave blank to autogenerate)
+rage --passphrase -o example.txt.age example.txt
+# Decrypt (no --passphrase needed; rage infers mode from --decrypt/-d)
+rage --decrypt example.txt.age > example.txt

@@ -1,0 +1,10 @@
+When you run rustup update stable (or rustup update), your toolchain jumps to the newest stable (say 1.96). Your old projects with rust-version = "1.94" will still build fine — no immediate breakage. The pin is advisory/declarative, not a hard lock.
+
+
+
+If you're refactoring an old app:
+
+First: cargo update && cargo fix --edition && cargo fix --edition-idioms
+Then flip edition & rust-version
+Fix remaining errors (usually few after the auto-fixes)
+Test thoroughly
