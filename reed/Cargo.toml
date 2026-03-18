@@ -1,0 +1,32 @@
+[package]
+name = "aix8"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.94.0"
+authors = ["Your Name"]
+description = "Reliable file encryption CLI with XChaCha20-Poly1305 streaming and Reed-Solomon recovery."
+license = "MIT"
+
+[lib]
+name = "aix8_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aix8"
+path = "src/bin/aix8.rs"
+
+[dependencies]
+anyhow = "1.0"
+argon2 = "0.5"
+blake3 = "1"
+chacha20poly1305 = "0.10"
+clap = { version = "4.5", features = ["derive"] }
+crossbeam-channel = "0.5"
+rand = "0.8"
+reed-solomon-erasure = "6"
+rpassword = "7.3"
+zeroize = "1"
+zstd = "0.13"
+
+[dev-dependencies]
+tempfile = "3.6"
