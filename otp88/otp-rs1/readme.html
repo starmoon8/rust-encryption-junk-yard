@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OTP-RS: Self-Healing One-Time Pad Encryption with Reed-Solomon</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --text: #c9d1d9;
+      --accent: #58a6ff;
+      --code-bg: #161b22;
+      --border: #30363d;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    h1, h2, h3 {
+      color: var(--accent);
+    }
+    h1 {
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+    }
+    code, pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-family: "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    pre {
+      padding: 16px;
+      overflow-x: auto;
+    }
+    .command {
+      background: #1f6feb22;
+      padding: 12px 16px;
+      border-left: 4px solid var(--accent);
+      margin: 16px 0;
+    }
+    ul, ol {
+      padding-left: 24px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .note {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .warning {
+      background: #3a2a1f;
+      border: 1px solid #d29922;
+      color: #f0d9a8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>OTP-RS: Self-Healing One-Time Pad Encryption</h1>
+
+    <p style="font-size: 1.15em; margin-bottom: 2em;">
+      <strong>The only simple CLI tool that gives you true one-time-pad security + automatic self-healing on decryption.</strong>
+    </p>
+
+    <h2>Why "self-healing" is special</h2>
+    <p>
+      Most encryption tools (AES, ChaCha20, etc.) completely break when the encrypted file gets even a few corrupted bytes.
+      Reed-Solomon error correction can fix that — <strong>but only if the encryption algorithm is perfectly linear</strong>.
+    </p>
+    <p>
+      XOR (one-time pad) is the only common algorithm that satisfies this perfectly. Because of that, OTP-RS can:
+    </p>
+    <ul>
+      <li>Encrypt with perfect one-time-pad security</li>
+      <li>Automatically detect and repair bit flips / small damage during decryption</li>
+      <li>Recover the original file even if the .enc file is partially corrupted</li>
+    </ul>
+    <div class="note">
+      <strong>Picocrypt is the only other known tool that does this cleanly.</strong><br>
+      Everything else either breaks Reed-Solomon math or uses much slower/heavier methods.
+    </div>
+
+    <h2>What is OTP-RS?</h2>
+    <p>
+      A tiny, Linux-only Rust CLI that combines:
+    </p>
+    <ul>
+      <li><strong>Pure one-time pad (OTP) XOR encryption</strong> — information-theoretically secure when using a truly random key</li>
+      <li><strong>Built-in Reed-Solomon error correction</strong> — self-healing on decrypt (up to 16 errors per 223-byte block)</li>
+      <li><strong>Convenient password-based key generator</strong> (Argon2id + ChaCha20)</li>
+    </ul>
+    <div class="warning">
+      <strong>Security reminder:</strong> The built-in keygen is convenient but <strong>not</strong> true OTP security — it is only as strong as your password. For maximum security, generate truly random keys with external tools.
+    </div>
+
+    <h2>Usage (after compiling)</h2>
+    <p>First build the app once:</p>
+    <div class="command">
+      cargo build --release
+    </div>
+    <p>After that you can run it directly from the project folder:</p>
+
+    <h3>1. Create a test file</h3>
+    <div class="command">
+      echo "This is my super secret message!" > example.txt
+    </div>
+
+    <h3>2. Generate a key (convenience mode)</h3>
+    <div class="command">
+      ./target/release/otp-rs keygen 500MiB
+    </div>
+    <p>(It will prompt for a password twice and create <code>key.key</code> in the current directory.)</p>
+
+    <h3>3. Encrypt</h3>
+    <div class="command">
+      ./target/release/otp-rs encrypt example.txt example.enc
+    </div>
+
+    <h3>4. (Optional) Simulate damage</h3>
+    <div class="command">
+      # Flip a few random bytes to test self-healing<br>
+      python3 -c 'import random; d=open("example.enc","rb").read(); open("example.enc","wb").write(d[:100] + bytes([b^0xFF for b in d[100:103]]) + d[103:])'
+    </div>
+
+    <h3>5. Decrypt (self-healing happens automatically)</h3>
+    <div class="command">
+      ./target/release/otp-rs decrypt example.enc recovered.txt
+    </div>
+    <p>You will see: <code>Decryption successful (Reed-Solomon recovery applied automatically)</code></p>
+
+    <h2>Keygen Command Reference</h2>
+    <div class="command">
+      ./target/release/otp-rs keygen &lt;SIZE&gt; [--force] [--output &lt;PATH&gt;]
+    </div>
+    <p>Examples:</p>
+    <pre>
+./target/release/otp-rs keygen 1GiB
+./target/release/otp-rs keygen 2GB --force
+./target/release/otp-rs keygen 500MiB --output my-secret-pad.key
+    </pre>
+    <p>Supported sizes: <code>1GB</code>, <code>500MiB</code>, <code>2.5GiB</code>, or raw bytes like <code>1073741824</code>.</p>
+
+    <div class="note">
+      The built-in keygen is fast and convenient for everyday use. For maximum security you can still drop in a truly random key made by any other tool (stardust-keygen, dice rolls, hardware RNG, etc.).
+    </div>
+
+    <h2>Built-in Testing</h2>
+    <p>OTP-RS comes with two levels of testing:</p>
+
+    <h3>1. Quick integration tests (cargo test)</h3>
+    <div class="command">
+      # 1. Generate test files + matching keys
+      cargo run --bin generate_random_files
+      <br><br>
+      # 2. Run all tests (encrypt → corrupt → decrypt + verify)
+      cargo test
+    </div>
+    <p>These tests run in parallel and intentionally corrupt files to prove Reed-Solomon recovery works.</p>
+
+    <h3>2. Manual large-file testing</h3>
+    <p>You can also manually test any file the same way:</p>
+    <div class="command">
+      ./target/release/otp-rs encrypt tests/data/random_files/file_1048576B.bin test.enc<br>
+      ./target/release/otp-rs decrypt test.enc recovered.bin<br>
+      diff tests/data/random_files/file_1048576B.bin recovered.bin
+    </div>
+
+    <p style="margin-top: 3em; text-align: center; font-size: 0.9em; color: #8b949e;">
+      OTP-RS — March 2026<br>
+      Linux-only • MIT licensed • Pure Rust<br>
+      Questions or ideas? Just open an issue on GitHub.
+    </p>
+
+  </div>
+</body>
+</html>

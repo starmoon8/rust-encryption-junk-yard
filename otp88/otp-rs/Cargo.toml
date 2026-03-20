@@ -1,0 +1,18 @@
+[package]
+name = "otp-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.0"
+description = "Linux-only CLI app for OTP-style XOR encryption with Reed-Solomon error correction and recovery."
+default-run = "otp-rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+reed-solomon = "0.2"
+rand = "0.8"  # <--- add this line
+
+[dev-dependencies]
+assert_cmd = "2.0"
+tempfile = "3.6"
+rayon = "1.7"

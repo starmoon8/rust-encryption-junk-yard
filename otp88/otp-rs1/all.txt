@@ -1,0 +1,441 @@
+=========================================
+
+===== Cargo.toml =====
+
+[package]
+name = "otp-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94.0"
+description = "Linux-only CLI app for OTP-style XOR encryption with Reed-Solomon error correction and recovery."
+default-run = "otp-rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+reed-solomon = "0.2"
+rand = "0.8"  # <--- add this line
+
+[dev-dependencies]
+assert_cmd = "2.0"
+tempfile = "3.6"
+rayon = "1.7"
+===== src/main.rs =====
+
+use anyhow::{bail, Context, Result};
+use clap::{Parser, Subcommand};
+use reed_solomon::{Decoder, Encoder};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[cfg(not(target_os = "linux"))]
+compile_error!("This app is Linux-only.");
+
+const ECC_LEN: usize = 32; // Corrects up to 16 errors per block
+const MAX_DATA_PER_BLOCK: usize = 255 - ECC_LEN; // 223 bytes
+const KEY_FILE: &str = "./key.key";
+const HEADER_LEN: usize = 8; // u64 for original plaintext length
+
+#[derive(Parser)]
+#[command(name = "otp-rs")]
+#[command(about = "OTP-style XOR encryption with Reed-Solomon error correction")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+    /// Enable verbose output (shows block-level info)
+    #[arg(short, long, default_value_t = false)]
+    verbose: bool,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Encrypt the input file (XOR + RS encode)
+    Encrypt {
+        /// Path to input plaintext file
+        input: PathBuf,
+        /// Path to output encrypted file
+        output: PathBuf,
+    },
+    /// Decrypt the input file (RS decode + XOR)
+    Decrypt {
+        /// Path to input encrypted file
+        input: PathBuf,
+        /// Path to output decrypted file
+        output: PathBuf,
+    },
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Encrypt { input, output } => encrypt(&input, &output, cli.verbose),
+        Commands::Decrypt { input, output } => decrypt(&input, &output, cli.verbose),
+    }
+}
+
+fn load_key() -> Result<Vec<u8>> {
+    let key_path = Path::new(KEY_FILE);
+
+    if !key_path.exists() {
+        bail!("ERROR: key.key not found in current directory.\nPlace your one-time pad file named exactly 'key.key' here and try again.");
+    }
+    if !key_path.is_file() {
+        bail!("ERROR: 'key.key' exists but is not a regular file.");
+    }
+
+    let key = fs::read(key_path).context("Failed to read key.key")?;
+    Ok(key)
+}
+
+fn encrypt(input_path: &PathBuf, output_path: &PathBuf, verbose: bool) -> Result<()> {
+    let key = load_key()?;
+    let plaintext = fs::read(input_path).context("Failed to read input file")?;
+    let orig_len = plaintext.len() as u64;
+
+    // Append header with original length
+    let mut data = plaintext.clone();
+    data.extend_from_slice(&orig_len.to_be_bytes());
+    let data_len = data.len();
+
+    // Strict key length check
+    if key.len() < data_len {
+        bail!("ERROR: key.key is too short.\nIt must be at least {} bytes (input + header).", data_len);
+    }
+
+    // XOR (plaintext + header) with key
+    let xor_data: Vec<u8> = data.iter().zip(key.iter()).map(|(&d, &k)| d ^ k).collect();
+
+    // RS encode (variable-length blocks)
+    let enc = Encoder::new(ECC_LEN);
+    let mut encoded = Vec::with_capacity(xor_data.len() + (xor_data.len() / MAX_DATA_PER_BLOCK + 1) * ECC_LEN);
+
+    for (i, chunk) in xor_data.chunks(MAX_DATA_PER_BLOCK).enumerate() {
+        let block_encoded = enc.encode(chunk);
+        encoded.extend_from_slice(&*block_encoded);
+        if verbose {
+            println!("Block {}: {} bytes encoded", i, block_encoded.len());
+        }
+    }
+
+    fs::write(output_path, &encoded).context("Failed to write output file")?;
+    println!("Encryption successful: {}", output_path.display());
+    Ok(())
+}
+
+fn decrypt(input_path: &PathBuf, output_path: &PathBuf, verbose: bool) -> Result<()> {
+    let key = load_key()?;
+    let encoded = fs::read(input_path).context("Failed to read input file")?;
+    let dec = Decoder::new(ECC_LEN);
+
+    let mut recovered_xor = Vec::new();
+    let mut offset = 0;
+    let mut block_index = 0;
+
+    while offset < encoded.len() {
+        let remaining = encoded.len() - offset;
+        let block_len = remaining.min(255);
+        if block_len < ECC_LEN + 1 {
+            bail!("Invalid/corrupted block at offset {}", offset);
+        }
+
+        let mut block = encoded[offset..offset + block_len].to_vec();
+        let corrected = dec
+            .correct(&mut block, None)
+            .map_err(|e| anyhow::anyhow!("Unrecoverable errors in block {}: {:?}", block_index, e))?;
+
+        recovered_xor.extend_from_slice(corrected.data());
+
+        if verbose {
+            println!("Block {}: {} bytes recovered", block_index, corrected.data().len());
+        }
+
+        offset += block_len;
+        block_index += 1;
+    }
+
+    // Key length check
+    if key.len() < recovered_xor.len() {
+        bail!("ERROR: key.key is too short for the recovered data.");
+    }
+
+    // XOR back
+    let data: Vec<u8> = recovered_xor.iter().zip(key.iter()).map(|(&c, &k)| c ^ k).collect();
+
+    // Extract header safely
+    if data.len() < HEADER_LEN {
+        bail!("Recovered data too short for header");
+    }
+    let header: [u8; HEADER_LEN] = data[data.len() - HEADER_LEN..].try_into()?;
+    let orig_len = u64::from_be_bytes(header) as usize;
+
+    if data.len() != orig_len + HEADER_LEN {
+        bail!("Recovered data length mismatch — possible corruption or wrong key");
+    }
+
+    let plaintext = &data[0..orig_len];
+    fs::write(output_path, plaintext).context("Failed to write output file")?;
+    println!("Decryption successful (Reed-Solomon recovery applied automatically): {}", output_path.display());
+    Ok(())
+}
+===== src/bin/generate_random_files.rs =====
+
+use std::fs;
+use std::path::Path;
+use rand::Rng;
+
+/// Generate a random file of `size_bytes` and a matching key
+fn generate_file(file_path: &Path, size_bytes: usize) -> std::io::Result<()> {
+    let mut rng = rand::thread_rng();
+
+    // Generate random file content
+    let mut data = vec![0u8; size_bytes];
+    rng.fill(&mut data[..]);
+    fs::write(file_path, &data)?;
+
+    // Generate key of length = file + 8 bytes header
+    let key_path = file_path.parent().unwrap().join("key.key");
+    let mut key = vec![0u8; size_bytes + 8];
+    rng.fill(&mut key[..]);
+    fs::write(&key_path, &key)?;
+
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    let dir = Path::new("tests/data/random_files");
+    fs::create_dir_all(dir)?;
+
+    // Example sizes: 1 KB, 1 MB, 10 MB, 100 MB
+    let sizes = [
+        1 * 1024,
+        1 * 1024 * 1024,
+        10 * 1024 * 1024,
+        100 * 1024 * 1024,
+        // Uncomment for large stress test:
+        // 1024 * 1024 * 1024, // 1 GB
+        // 2 * 1024 * 1024 * 1024, // 2 GB
+    ];
+
+    for &size in &sizes {
+        let file_path = dir.join(format!("file_{}B.bin", size));
+        println!("Generating random file: {} bytes", size);
+        generate_file(&file_path, size)?;
+    }
+
+    Ok(())
+}
+===== Test files (*.rs in tests/) =====
+
+===== tests/generate_random_files.rs =====
+
+use std::fs;
+use std::path::Path;
+use rand::Rng;
+
+/// Generate a random file of `size_bytes` and a matching key
+fn generate_file(file_path: &Path, size_bytes: usize) -> std::io::Result<()> {
+    // Generate random file content
+    let mut rng = rand::thread_rng();
+    let mut data = vec![0u8; size_bytes];
+    rng.fill(&mut data[..]);
+    fs::write(file_path, &data)?;
+
+    // Generate key of length = file + 8 bytes header
+    let key_path = file_path.parent().unwrap().join("key.key");
+    let mut key = vec![0u8; size_bytes + 8];
+    rng.fill(&mut key[..]);
+    fs::write(key_path, &key)?;
+
+    Ok(())
+}
+
+fn main() -> std::io::Result<()> {
+    let dir = Path::new("tests/data/random_files");
+    fs::create_dir_all(dir)?;
+
+    // Example sizes: 1 KB, 1 MB, 10 MB, 100 MB (or up to 2 GB)
+    let sizes = [
+        1 * 1024,
+        1 * 1024 * 1024,
+        10 * 1024 * 1024,
+        100 * 1024 * 1024,
+        // 1 * 1024 * 1024 * 1024, // 1 GB (uncomment to stress test)
+    ];
+
+    for &size in &sizes {
+        let file_path = dir.join(format!("file_{}B.bin", size));
+        println!("Generating random file: {} bytes", size);
+        generate_file(&file_path, size)?;
+    }
+
+    Ok(())
+}
+===== tests/integration.rs =====
+
+use assert_cmd::Command;
+
+use std::fs;
+use tempfile::TempDir;
+
+#[test]
+fn test_encrypt_decrypt_small_file() -> Result<(), Box<dyn std::error::Error>> {
+    // Create a temporary directory for files
+    let tmp = TempDir::new()?;
+    let plaintext_path = tmp.path().join("test.txt");
+    let enc_path = tmp.path().join("test.enc");
+    let dec_path = tmp.path().join("test.dec");
+    let key_path = tmp.path().join("key.key");
+
+    // Create a small test file
+    fs::write(&plaintext_path, b"Hello OTP-RS Testing!")?;
+
+    // Generate a key (length = file + 8)
+    let data_len = fs::read(&plaintext_path)?.len() + 8;
+    let key: Vec<u8> = (0..data_len).map(|_| rand::random::<u8>()).collect();
+    fs::write(&key_path, &key)?;
+
+    // Encrypt
+    Command::cargo_bin("otp-rs")?
+        .args(["encrypt", plaintext_path.to_str().unwrap(), enc_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Decrypt
+    Command::cargo_bin("otp-rs")?
+        .args(["decrypt", enc_path.to_str().unwrap(), dec_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Verify decrypted matches original
+    let orig = fs::read(&plaintext_path)?;
+    let dec = fs::read(&dec_path)?;
+    assert_eq!(orig, dec);
+
+    Ok(())
+}
+
+#[test]
+fn test_rs_error_correction() -> Result<(), Box<dyn std::error::Error>> {
+    let tmp = TempDir::new()?;
+    let plaintext_path = tmp.path().join("test2.txt");
+    let enc_path = tmp.path().join("test2.enc");
+    let dec_path = tmp.path().join("test2.dec");
+    let key_path = tmp.path().join("key.key");
+
+    fs::write(&plaintext_path, b"Reed-Solomon error recovery test")?;
+    let data_len = fs::read(&plaintext_path)?.len() + 8;
+    let key: Vec<u8> = (0..data_len).map(|_| rand::random::<u8>()).collect();
+    fs::write(&key_path, &key)?;
+
+    // Encrypt
+    Command::cargo_bin("otp-rs")?
+        .args(["encrypt", plaintext_path.to_str().unwrap(), enc_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Corrupt some bytes
+    let mut enc_data = fs::read(&enc_path)?;
+    if enc_data.len() > 2 {
+        enc_data[1] ^= 0xFF; // flip one byte
+        enc_data[2] ^= 0xAA; // flip another
+        fs::write(&enc_path, &enc_data)?;
+    }
+
+    // Decrypt (RS should correct)
+    Command::cargo_bin("otp-rs")?
+        .args(["decrypt", enc_path.to_str().unwrap(), dec_path.to_str().unwrap()])
+        .assert()
+        .success();
+
+    // Verify decrypted matches original
+    let orig = fs::read(&plaintext_path)?;
+    let dec = fs::read(&dec_path)?;
+    assert_eq!(orig, dec);
+
+    Ok(())
+}
+===== tests/run_all_tests.rs =====
+
+use assert_cmd::Command;
+use rayon::prelude::*;
+use std::fs;
+use std::path::PathBuf;
+use tempfile::TempDir;
+
+/// Run a single test for a given file and its existing key
+fn run_test(file: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let tmp = TempDir::new()?;
+
+    let input_path = PathBuf::from(file);
+    let tmp_input_path = tmp.path().join("input.txt");
+    let enc_path = tmp.path().join("file.enc");
+    let dec_path = tmp.path().join("file.dec");
+    let key_path = tmp.path().join("key.key");
+
+    // Copy input file and key
+    fs::copy(&input_path, &tmp_input_path)?;
+    let original_key_path = input_path.parent().unwrap().join("key.key");
+    fs::copy(&original_key_path, &key_path)?;
+
+    // Encrypt
+    Command::cargo_bin("otp-rs")?
+        .current_dir(&tmp)
+        .args(["encrypt", "input.txt", "file.enc"])
+        .assert()
+        .success();
+
+    // Inject minor corruption
+    let mut enc_data = fs::read(&enc_path)?;
+    if enc_data.len() > 2 {
+        enc_data[1] ^= 0xAA;
+        enc_data[2] ^= 0x55;
+        fs::write(&enc_path, &enc_data)?;
+    }
+
+    // Decrypt
+    Command::cargo_bin("otp-rs")?
+        .current_dir(&tmp)
+        .args(["decrypt", "file.enc", "file.dec"])
+        .assert()
+        .success();
+
+    // Verify
+    let orig = fs::read(&tmp_input_path)?;
+    let dec = fs::read(&dec_path)?;
+    assert_eq!(orig, dec, "Decrypted file does not match original");
+
+    Ok(())
+}
+
+#[test]
+fn run_all_samples_parallel() {
+    let data_dir = PathBuf::from("tests/data/random_files");
+    let files: Vec<_> = fs::read_dir(&data_dir)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_file() && path.extension().map(|e| e == "bin").unwrap_or(false) {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Use rayon to test multiple files in parallel
+    let results: Vec<_> = files
+        .par_iter()
+        .map(|file| run_test(file.to_str().unwrap()))
+        .collect();
+
+    // Check for any failures and panic with the first one
+    for result in results {
+        if let Err(e) = result {
+            panic!("Test failed: {}", e);
+        }
+    }
+}
+=========================================
+Dump finished → see all.txt
