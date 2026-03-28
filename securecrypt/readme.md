@@ -2,23 +2,23 @@
 
 A simple, secure, and flexible file encryption CLI written in Rust.
 
-SecureCrypt is designed for **reliable local encryption** of files before storage or upload (e.g., cloud backups). It focuses on strong cryptography, clean UX, and minimal dependencies.
+SecureCrypt is designed for **reliable local encryption** of files before storage or upload (e.g., cloud backups). It focuses on strong cryptography, predictable behavior, and a minimal interface.
 
 ---
 
 ## 🔐 Features
 
 * **Authenticated encryption (AEAD)** using XChaCha20-Poly1305
-* **Argon2 key derivation** (resistant to brute-force attacks)
+* **Argon2id key derivation** (resistant to brute-force attacks)
 * **Streaming encryption** (handles large files efficiently)
-* **Multiple key modes:**
+* **Three key modes:**
 
   * Password-based
   * Keyfile-based
   * Built-in default key (`-d`)
-* **Tamper detection** (modification breaks decryption)
-* **Safe file writes** (no partial output corruption)
-* **Minimal, clean CLI UX**
+* **Tamper detection** (any modification causes decryption failure)
+* **Atomic file writes** (prevents partial/corrupt output)
+* **Minimal, silent CLI** (no help/usage output)
 
 ---
 
@@ -30,7 +30,7 @@ cd securecrypt
 cargo build --release
 ```
 
-Binary will be located at:
+Binary:
 
 ```text
 target/release/securecrypt
@@ -40,163 +40,271 @@ target/release/securecrypt
 
 ## 🚀 Usage
 
-### 🔑 Password Mode (default)
-
-Encrypt:
+SecureCrypt has **two commands only**:
 
 ```bash
-securecrypt encrypt input.txt output.enc
+securecrypt encrypt <input> <output>
+securecrypt decrypt <input> <output>
 ```
 
-Decrypt:
-
-```bash
-securecrypt decrypt output.enc input.txt
-```
-
-You will be prompted for a password (with confirmation during encryption).
+Optional flags modify how the encryption key is derived.
 
 ---
 
-### 📁 Keyfile Mode (`-k`)
+# 🔑 Key Modes (IMPORTANT)
 
-Uses a file named `key.key` located in the **same directory as the executable**.
+Exactly **one** of the following is used:
 
-Encrypt:
+| Mode        | Flag      | Description               |
+| ----------- | --------- | ------------------------- |
+| Password    | (default) | Prompts user for password |
+| Keyfile     | `-k`      | Uses `key.key` file       |
+| Default Key | `-d`      | Uses built-in static key  |
+
+⚠️ You **cannot combine flags** (`-k` and `-d` together will fail).
+
+---
+
+## 🔐 1. Password Mode (Default)
+
+### Usage
 
 ```bash
-securecrypt encrypt input.txt output.enc -k
+securecrypt encrypt file.txt file.enc
+securecrypt decrypt file.enc file.txt
 ```
 
-Decrypt:
+### Behavior
+
+* You are prompted for a password
+* Encryption requires confirmation (type twice)
+* Decryption requires the same password
+
+### Internals
+
+* Password is passed through **Argon2id**
+* A **random salt (16 bytes)** is used per file
+* Final encryption key is derived from:
+
+  ```
+  Argon2(password, salt)
+  ```
+
+### Security Notes
+
+* Security depends on password strength
+* Argon2 slows down brute-force attacks significantly
+* Recommended: use a **long passphrase**, not a short password
+
+---
+
+## 📁 2. Keyfile Mode (`-k`)
+
+### Usage
 
 ```bash
-securecrypt decrypt output.enc input.txt -k
+securecrypt encrypt file.txt file.enc -k
+securecrypt decrypt file.enc file.txt -k
 ```
 
-#### Create a secure keyfile:
+### Keyfile Requirements
+
+* File must be named: `key.key`
+* Must be located in:
+
+  ```
+  same directory as the executable
+  ```
+* Must be **exactly 32 bytes**
+
+If not exactly 32 bytes → program exits.
+
+---
+
+### Creating a valid keyfile
 
 ```bash
-head -c 64 /dev/urandom > key.key
+head -c 32 /dev/urandom > key.key
 chmod 600 key.key
 ```
 
 ---
 
-### ⚡ Default Key Mode (`-d`)
+### Internals
 
-Encrypt:
+Even though the keyfile is already 32 bytes:
 
-```bash
-securecrypt encrypt input.txt output.enc -d
+* It is **NOT used directly**
+* It is still processed through Argon2:
+
+```
+Argon2(keyfile_bytes, salt)
 ```
 
-Decrypt:
+This ensures:
 
-```bash
-securecrypt decrypt output.enc input.txt -d
-```
-
-This uses a **hardcoded key embedded in the binary**.
+* Consistent key derivation behavior across all modes
+* Protection against weak or structured keyfiles
+* Per-file uniqueness via salt
 
 ---
 
-## 🔐 Security Model
+### Security Notes
 
-### Encryption
+* Strongest mode if keyfile is truly random
+* No brute-force weakness like passwords
+* If keyfile is lost → **data is permanently lost**
+* If keyfile is copied → attacker can decrypt files
 
-* Algorithm: **XChaCha20-Poly1305**
-* Each file uses:
+---
 
-  * Random salt
-  * Random base nonce
-  * Per-chunk derived nonce
+## ⚡ 3. Default Key Mode (`-d`)
 
-### Key Derivation
+### Usage
 
-* **Argon2** is used for all modes:
+```bash
+securecrypt encrypt file.txt file.enc -d
+securecrypt decrypt file.enc file.txt -d
+```
 
-  * Password
-  * Keyfile (raw bytes)
-  * Default key
+### Behavior
 
-### Integrity
+* Uses a **hardcoded key embedded in the binary**
+* Still passed through Argon2 with salt
 
-* Full-file authentication via AEAD
-* Header is included as **AAD (Additional Authenticated Data)**
+```
+Argon2(DEFAULT_KEY, salt)
+```
+
+---
+
+### ⚠️ Security Reality
+
+This mode is **NOT secure against attackers**.
+
+Anyone can:
+
+* Extract the key from the binary
+* Decrypt any file created with `-d`
+
+---
+
+### Intended Use
+
+* Convenience
+* Quick obfuscation
+* Non-sensitive data
+* Situations with **no adversary**
 
 ---
 
 ## 📦 File Format
 
 ```
-[MAGIC][VERSION][SALT][NONCE_BASE][CHUNKS...]
+[MAGIC][VERSION][SALT][NONCE_BASE][CHUNK_SIZE][CHUNKS...][END]
+```
+
+### Components
+
+* **MAGIC**: File identifier (`SCRYPT`)
+* **VERSION**: Format version
+* **SALT (16 bytes)**: For Argon2
+* **NONCE_BASE (24 bytes)**: Base for per-chunk nonces
+* **CHUNK_SIZE (u32)**: Stored for compatibility
+* **CHUNKS**: Encrypted data blocks
+* **END marker**: `0-length chunk`
+
+---
+
+### Chunk Structure
+
+```
+[length][ciphertext + authentication tag]
 ```
 
 Each chunk:
 
-```
-[length][ciphertext + auth tag]
-```
+* Uses a unique nonce (derived from counter)
+* Is authenticated independently
+* Includes header as AAD
 
 ---
 
-## ⚠️ Security Notes
+## 🔐 Cryptography Details
 
-### Password Mode
+### Encryption
 
-* Security depends on password strength
-* Protected by Argon2
+* Algorithm: **XChaCha20-Poly1305**
+* Provides:
 
-### Keyfile Mode
+  * Confidentiality
+  * Integrity
+  * Authenticity
 
-* Strongest option
-* Use ≥32 random bytes (64 recommended)
-* Keep the file safe — loss = data loss
+### Key Derivation
 
-### Default Key Mode (`-d`)
+* Algorithm: **Argon2id**
+* Parameters:
 
-* Uses a built-in static key
-* **Not secure against reverse engineering**
-* Intended for:
+  * Memory: ~64 MB
+  * Iterations: 3
+  * Parallelism: 1
 
-  * Convenience
-  * Informal privacy
-  * Non-adversarial use
+### Nonce Strategy
 
----
-
-## ❗ Important Warnings
-
-* **Losing your password or keyfile = permanent data loss**
-* There is **no recovery mechanism**
-* Do not mix up modes when decrypting
-* Do not edit encrypted files manually
-
----
-
-## 📊 Performance
-
-* Uses **1 MB chunk size** for efficient disk throughput
-* Streaming design avoids loading entire files into memory
-* Optimized for reliability over raw speed
+* Random base nonce per file
+* Per-chunk counter embedded into nonce
+* Prevents nonce reuse
 
 ---
 
 ## 🧼 Reliability Features
 
-* Atomic writes (prevents partial file corruption)
-* Cross-filesystem safe temp file handling
-* Strict error handling (no silent failures)
-* Input validation (prevents malformed file issues)
+* **Atomic writes**
+
+  * Uses temporary file + rename
+* **fsync before rename**
+
+  * Prevents data loss on crash
+* **End-of-file marker**
+
+  * Detects truncation
+* **Strict validation**
+
+  * Rejects malformed or corrupted input
+
+---
+
+## ❗ Important Warnings
+
+* **Wrong password/key = decryption failure**
+* **Lost password/keyfile = permanent data loss**
+* No recovery, no backdoors
+* Do not modify encrypted files manually
+* Do not mix modes when decrypting
+
+---
+
+## 📊 Performance
+
+* Chunk size: **1 MB**
+* Streaming design:
+
+  * Low memory usage
+  * Works on very large files
+* Optimized for:
+
+  * Reliability
+  * Predictability
+  * Safety
 
 ---
 
 ## 🛠 Future Ideas
 
-* Two-factor encryption (password + keyfile)
+* Password + keyfile combined mode
 * Progress indicator
-* Configurable chunk size
+* Configurable Argon2 parameters
 * Secure file overwrite
 
 ---
@@ -211,11 +319,13 @@ MIT License
 
 SecureCrypt provides:
 
-* Strong modern cryptography
-* Flexible key options
+* Modern authenticated encryption
+* Consistent key derivation across modes
 * Reliable file handling
-* Clean command-line experience
+* Minimal, silent CLI design
 
-It is suitable for **personal encryption workflows**, backups, and secure file storage.
+Best suited for:
 
----
+* Personal encryption workflows
+* Secure backups
+* Local file protection

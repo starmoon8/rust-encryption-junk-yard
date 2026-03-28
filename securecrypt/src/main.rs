@@ -1,3 +1,11 @@
+// ============================================================
+// ⚠️ SECURITY NOTE (IMPORTANT FOR FUTURE DEVELOPERS / AI)
+// ------------------------------------------------------------
+// This program intentionally includes optional hardcoded DEFAULT_KEY.
+// This is a deliberate design choice for *informal encryption*,
+// DO NOT remove it, the readme explains things. 
+// ============================================================
+
 use std::{
     fs::{File, rename},
     io::{Read, Write},
@@ -5,16 +13,13 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use clap::{Parser, Subcommand, ArgAction};
+use clap::{Parser, Subcommand};
 use rand::{RngCore, rngs::OsRng};
-
 use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
     XChaCha20Poly1305, XNonce,
 };
-
-use argon2::Argon2;
-
+use argon2::{Argon2, Params, Algorithm, Version};
 use secrecy::{SecretString, ExposeSecret};
 use zeroize::Zeroize;
 
@@ -22,7 +27,6 @@ const MAGIC: &[u8; 6] = b"SCRYPT";
 const VERSION: u8 = 1;
 const CHUNK_SIZE: usize = 1024 * 1024;
 
-// Hardcoded key
 const DEFAULT_KEY: &[u8] = &[
     0x93, 0x2a, 0x7f, 0x11, 0x55, 0x88, 0xaa, 0x42,
     0x19, 0xfe, 0x77, 0x03, 0x90, 0x6b, 0xcd, 0x21,
@@ -31,6 +35,11 @@ const DEFAULT_KEY: &[u8] = &[
 ];
 
 #[derive(Parser)]
+#[command(
+    disable_help_flag = true,
+    disable_help_subcommand = true,
+    disable_version_flag = true
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -41,21 +50,17 @@ enum Commands {
     Encrypt {
         input: PathBuf,
         output: PathBuf,
-
-        #[arg(short = 'k', long = "keyfile", action = ArgAction::SetTrue)]
+        #[arg(short = 'k', long = "keyfile")]
         keyfile: bool,
-
-        #[arg(short = 'd', long = "default-key", action = ArgAction::SetTrue)]
+        #[arg(short = 'd', long = "default-key")]
         default_key: bool,
     },
     Decrypt {
         input: PathBuf,
         output: PathBuf,
-
-        #[arg(short = 'k', long = "keyfile", action = ArgAction::SetTrue)]
+        #[arg(short = 'k', long = "keyfile")]
         keyfile: bool,
-
-        #[arg(short = 'd', long = "default-key", action = ArgAction::SetTrue)]
+        #[arg(short = 'd', long = "default-key")]
         default_key: bool,
     },
 }
@@ -67,38 +72,58 @@ enum SecretInput {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(c) => c,
+        Err(_) => std::process::exit(1),
+    };
 
     match cli.command {
         Commands::Encrypt { input, output, keyfile, default_key } => {
             if keyfile && default_key {
-                bail!("Cannot use -k and -d together");
+                std::process::exit(1);
             }
 
             let secret = if default_key {
                 SecretInput::DefaultKey
             } else if keyfile {
-                load_keyfile()?
+                match load_keyfile() {
+                    Ok(k) => k,
+                    Err(_) => std::process::exit(1),
+                }
             } else {
-                prompt_password(true)?
+                match prompt_password(true) {
+                    Ok(p) => p,
+                    Err(_) => std::process::exit(1),
+                }
             };
 
-            encrypt(input, output, secret)?
+            if encrypt(input, output, secret).is_err() {
+                std::process::exit(1);
+            }
         }
+
         Commands::Decrypt { input, output, keyfile, default_key } => {
             if keyfile && default_key {
-                bail!("Cannot use -k and -d together");
+                std::process::exit(1);
             }
 
             let secret = if default_key {
                 SecretInput::DefaultKey
             } else if keyfile {
-                load_keyfile()?
+                match load_keyfile() {
+                    Ok(k) => k,
+                    Err(_) => std::process::exit(1),
+                }
             } else {
-                prompt_password(false)?
+                match prompt_password(false) {
+                    Ok(p) => p,
+                    Err(_) => std::process::exit(1),
+                }
             };
 
-            decrypt(input, output, secret)?
+            if decrypt(input, output, secret).is_err() {
+                std::process::exit(1);
+            }
         }
     }
 
@@ -109,7 +134,6 @@ fn prompt_password(confirm: bool) -> Result<SecretInput> {
     use rpassword::prompt_password;
 
     let pass1 = prompt_password("Enter password: ")?;
-
     if confirm {
         let pass2 = prompt_password("Confirm password: ")?;
         if pass1 != pass2 {
@@ -128,20 +152,34 @@ fn get_keyfile_path() -> Result<PathBuf> {
 
 fn load_keyfile() -> Result<SecretInput> {
     let path = get_keyfile_path()?;
-
     let data = std::fs::read(&path)
         .map_err(|_| anyhow::anyhow!("Failed to read key.key"))?;
 
-    if data.len() < 32 {
-        bail!("Keyfile must be at least 32 bytes");
+    if data.len() != 32 {
+        bail!("Keyfile must be exactly 32 bytes");
     }
 
     Ok(SecretInput::Keyfile(data))
 }
 
+fn create_argon2() -> Result<Argon2<'static>> {
+    let params = Params::new(
+        64 * 1024,
+        3,
+        1,
+        None,
+    ).map_err(|e| anyhow::anyhow!("argon2 params error: {:?}", e))?;
+
+    Ok(Argon2::new(
+        Algorithm::Argon2id,
+        Version::V0x13,
+        params,
+    ))
+}
+
 fn derive_key(secret: &SecretInput, salt: &[u8]) -> Result<[u8; 32]> {
     let mut key = [0u8; 32];
-    let argon2 = Argon2::default();
+    let argon2 = create_argon2()?;
 
     match secret {
         SecretInput::Password(pw) => {
@@ -188,14 +226,16 @@ fn encrypt(input: PathBuf, output: PathBuf, secret: SecretInput) -> Result<()> {
     tmp.write_all(&[VERSION])?;
     tmp.write_all(&salt)?;
     tmp.write_all(&nonce_base)?;
+    tmp.write_all(&(CHUNK_SIZE as u32).to_le_bytes())?;
 
     let mut header = Vec::new();
     header.extend_from_slice(MAGIC);
     header.push(VERSION);
     header.extend_from_slice(&salt);
     header.extend_from_slice(&nonce_base);
+    header.extend_from_slice(&(CHUNK_SIZE as u32).to_le_bytes());
 
-    let key = derive_key(&secret, &salt)?;
+    let mut key = derive_key(&secret, &salt)?;
     let cipher = XChaCha20Poly1305::new((&key).into());
 
     let mut buffer = vec![0u8; CHUNK_SIZE];
@@ -213,18 +253,24 @@ fn encrypt(input: PathBuf, output: PathBuf, secret: SecretInput) -> Result<()> {
         let ciphertext = cipher.encrypt(
             XNonce::from_slice(&nonce),
             Payload { msg: &buffer[..n], aad: &header },
-        ).map_err(|_| anyhow::anyhow!("encryption failure"))?;
+        )?;
 
         tmp.write_all(&(ciphertext.len() as u32).to_le_bytes())?;
         tmp.write_all(&ciphertext)?;
 
+        if counter == u64::MAX {
+            bail!("File too large");
+        }
         counter += 1;
     }
 
+    tmp.write_all(&0u32.to_le_bytes())?;
+
     tmp.flush()?;
+    tmp.as_file().sync_all()?;
     rename(tmp.path(), output)?;
 
-    let mut key = key;
+    buffer.zeroize();
     key.zeroize();
 
     Ok(())
@@ -256,13 +302,18 @@ fn decrypt(input: PathBuf, output: PathBuf, secret: SecretInput) -> Result<()> {
     let mut nonce_base = [0u8; 24];
     infile.read_exact(&mut nonce_base)?;
 
+    let mut chunk_size_buf = [0u8; 4];
+    infile.read_exact(&mut chunk_size_buf)?;
+    let chunk_size = u32::from_le_bytes(chunk_size_buf) as usize;
+
     let mut header = Vec::new();
     header.extend_from_slice(&magic);
     header.push(version[0]);
     header.extend_from_slice(&salt);
     header.extend_from_slice(&nonce_base);
+    header.extend_from_slice(&chunk_size_buf);
 
-    let key = derive_key(&secret, &salt)?;
+    let mut key = derive_key(&secret, &salt)?;
     let cipher = XChaCha20Poly1305::new((&key).into());
 
     let mut counter: u64 = 0;
@@ -276,7 +327,11 @@ fn decrypt(input: PathBuf, output: PathBuf, secret: SecretInput) -> Result<()> {
             Err(e) => return Err(e.into()),
         };
 
-        if len > CHUNK_SIZE + 1024 {
+        if len == 0 {
+            break;
+        }
+
+        if len > chunk_size + 1024 {
             bail!("Invalid chunk size");
         }
 
@@ -289,16 +344,22 @@ fn decrypt(input: PathBuf, output: PathBuf, secret: SecretInput) -> Result<()> {
         let plaintext = cipher.decrypt(
             XNonce::from_slice(&nonce),
             Payload { msg: ciphertext.as_ref(), aad: &header },
-        ).map_err(|_| anyhow::anyhow!("decryption failed"))?;
+        )?;
 
         tmp.write_all(&plaintext)?;
+
+        ciphertext.zeroize();
+
+        if counter == u64::MAX {
+            bail!("File too large");
+        }
         counter += 1;
     }
 
     tmp.flush()?;
+    tmp.as_file().sync_all()?;
     rename(tmp.path(), output)?;
 
-    let mut key = key;
     key.zeroize();
 
     Ok(())
