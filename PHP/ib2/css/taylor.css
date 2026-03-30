@@ -1,0 +1,152 @@
+
+html {
+    height: 100%;
+}
+
+body {
+  background-color: #EEF2FF;
+  background: -webkit-linear-gradient(#D1D5EE, #EEF2FF); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient(#D1D5EE, #EEF2FF); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient(#D1D5EE, #EEF2FF); /* For Firefox 3.6 to 15 */
+  background: linear-gradient(#D1D5EE, #EEF2FF); /* Standard syntax */
+  height: 100%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+
+
+
+.userdelete {
+ display:none;
+}
+
+
+
+
+
+
+input[type=checkbox]{
+    position:absolute;
+    opacity: 0;
+    z-index: -9999;
+}
+
+* {
+  color: #000;
+  font-family: arial,helvetica,sans-serif;
+  font-size: 10pt;
+}
+
+
+.reply {
+  background-color: #D1D5EE;
+  display: table;
+  border-left: 1px solid #F1F3FD;
+  border-top: 1px solid #F1F3FD;
+  border-right: 1px solid #A0AAE9;
+  border-bottom:  1px solid #A0AAE9;
+  padding: 7px;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+.message {
+
+   padding: 7px;
+  word-wrap: break-word;
+    word-break: break-all;
+}
+
+#message {
+  background-color: #D1D5EE;
+  display: table;
+  border-left: 1px solid #F1F3FD;
+  border-top: 1px solid #F1F3FD;
+  border-right: 1px solid #A0AAE9;
+  border-bottom:  1px solid #A0AAE9;
+  padding: 7px;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+
+
+#logo {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#boardname {
+  font-weight: bold;
+  font-size: 20px;
+  text-align: center;
+}
+
+#threadlabel {
+  vertical-align: top;
+}
+
+#threadcreate {
+  margin: 0 auto;
+  width: 300px;
+}
+
+#thumb {
+  display: block;
+  max-width:330px;
+  max-height:195px;
+  width: auto;
+  height: auto;
+  float:left;
+  margin-left: 5px;
+}
+
+#posttitle {
+  font-weight: bold;
+  color: blue;
+}
+
+#name {
+  font-weight: bold;
+  color: #789922;
+}
+
+#posttitle {
+  padding-left: 20px;
+}
+
+#body {
+  padding-left: 20px;
+}
+
+#greentext {
+  color: #789922;
+}
+
+#postcontainer {
+  background-color: #D1D5EE;
+  display: table;
+  border-left: 1px solid #F1F3FD;
+  border-top: 1px solid #F1F3FD;
+  border-right: 1px solid #A0AAE9;
+  border-bottom:  1px solid #A0AAE9;
+   word-wrap: break-word;
+    word-break: break-all;
+}
+#metadata {
+  margin-left: 5px;
+}
+
+#date {
+  margin-right: 5px;
+}
+
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: 1px solid #B7C5D9;
+  margin: 1em 0;
+  padding: 0;
+}
+

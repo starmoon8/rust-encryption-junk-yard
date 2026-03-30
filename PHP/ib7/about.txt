@@ -1,0 +1,1 @@
+the vichan files such as /css and /js have to be in root for this to work. 

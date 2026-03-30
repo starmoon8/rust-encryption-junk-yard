@@ -1,0 +1,84 @@
+
+html {
+    height: 100%;
+}
+
+body {
+ color: green;
+ background-color: #000000;
+ 
+}
+
+input[type=submit]:hover {
+  background-color: yellow;
+}
+
+input[type=submit] {
+  background-color: #45a049;
+}
+
+#threadcreate {
+  margin: 0 auto;
+  width: 300px;
+}
+
+
+
+.reply {
+  background-color: #000000;
+  display: table;
+  border-left: 1px solid green;
+  border-top: 1px solid green;
+  border-right: 1px solid green;
+  border-bottom:  1px solid green;
+  padding: 40px;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+.message {
+  background-color: #000000;
+   padding: 7px;
+  word-wrap: break-word;
+    word-break: break-all;
+}
+
+#message {
+  background-color: green;
+  display: table;
+  border-left: 1px dashed green;
+  border-top: 1px dashed green;
+  border-right: 1px dashed green;
+  border-bottom:  1px dashed green;
+  padding: 7px;
+
+}
+
+
+#body {
+  padding-left: 20px;
+}
+
+#greentext {
+  color: #789922;
+}
+
+#postcontainer {
+  background-color: #save;
+  display: table;
+  border-left: 1px solid #F1F3FD;
+  border-top: 1px solid #F1F3FD;
+  border-right: 1px solid #A0AAE9;
+  border-bottom:  1px solid #A0AAE9;
+   word-wrap: break-word;
+    word-break: break-all;
+}
+
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: 1px solid #B7C5D9;
+  margin: 1em 0;
+  padding: 0;
+}
+

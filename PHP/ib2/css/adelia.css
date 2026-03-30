@@ -1,0 +1,87 @@
+
+html {
+    height: 100%;
+}
+
+body {
+  background-color: grey;
+
+}
+
+* {
+  color: green;
+  font-family: arial,helvetica,sans-serif;
+  font-size: 10pt;
+}
+
+
+
+.reply {
+  background-color: black;
+  display: table;
+  border-left: 1px solid #000000;
+  border-top: 1px solid #000000;
+  border-right: 1px solid #000000;
+  border-bottom:  1px solid #000000;
+  padding: 7px;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+
+.message {
+  
+   padding: 7px;
+    word-wrap: break-word;
+    word-break: break-all;
+}
+
+#message {
+  color: green;
+  background-color: black;
+  display: table;
+  border-left: 1px solid black;
+  border-top: 1px solid black;
+  border-right: 1px solid black;
+  border-bottom:  1px solid black;
+  padding: 7px;
+}
+
+input[type=submit]:hover {
+  background-color: red;
+}
+
+input[type=submit] {
+  color: green;
+  background-color: black;
+  border-left: 1px solid #000000;
+  border-top: 1px solid #000000;
+  border-right: 1px solid #000000;
+  border-bottom:  1px solid #000000;
+  
+}
+
+
+
+
+#threadcreate {
+  margin: 0 auto;
+  width: 300px;
+}
+
+
+
+
+#greentext {
+  color: #789922;
+}
+
+
+hr {
+  display: block;
+  height: 1px;
+  border: 0;
+  border-top: 9px solid green;
+  margin: 1em 0;
+  padding: 0;
+}
+
