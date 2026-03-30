@@ -1,0 +1,9 @@
+ib/
+├── Cargo.toml
+├── src/
+│   └── main.rs
+├── base.html
+└── static/
+├── default.css
+└── uploads/  (created dynamically for uploaded files)
+└── chess_ib_db/  (created dynamically for Sled database)

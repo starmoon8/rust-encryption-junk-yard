@@ -1,0 +1,1 @@
+Uses postgre. Has pagination, posts, reply to post, - very nice. don't waste your time with it unless you know your way around postgres. this one is not for newbs... i will make other easier ones that do the same things. 

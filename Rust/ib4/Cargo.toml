@@ -1,0 +1,18 @@
+[package]
+name = "ChessBoard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.5", features = ["fs"] }
+axum-extra = { version = "0.9", features = ["multipart"] }
+image = "0.25"
+uuid = { version = "1.7", features = ["v4"] }
+chrono = { version = "0.4", features = ["clock"] }
+sqlx = { version = "0.8", default-features = false, features = ["macros", "migrate", "derive", "runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid"] }
+serde = { version = "1.0", features = ["derive"] }
+regex = "1.12"
+dotenvy = "0.15"
+url = "2.5"

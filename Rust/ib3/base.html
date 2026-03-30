@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ChessIB</title>
+    <link rel="stylesheet" href="/static/default.css">
+</head>
+<body>
+<header>
+    <h1>ChessIB</h1>
+    <div class="subtitle">General chess discussion, puzzles, and diagrams</div>
+</header>
+<hr><form method="post" action="/post" enctype="multipart/form-data">
+<table class="post-table">
+<tbody>
+    <tr><th>Name</th><td><input type="text" name="name" size="25" maxlength="35" autocomplete="off" placeholder="Anonymous"></td></tr>
+<tr><th>Subject</th><td><input type="text" name="subject" size="25" maxlength="100" autocomplete="off"></td></tr><tr><th>Comment</th><td><textarea name="message" rows="5" cols="35"></textarea></td></tr><tr><th>FEN</th><td><input type="text" name="fen" size="50" maxlength="100" autocomplete="off"></td></tr><tr><th>File</th><td><input type="file" name="file" id="upload_file"></td></tr><tr><th></th><td><input accesskey="s" type="submit" name="post" value="Post" /></td></tr>
+</tbody>
+</table>
+</form>
+<!-- POSTS -->
+</body></html>

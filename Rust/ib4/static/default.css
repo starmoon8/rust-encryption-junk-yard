@@ -1,0 +1,216 @@
+
+body {
+background: #EEF2FF url('fade-blue.png') repeat-x 50% 0%;
+color: black;
+font-family: arial,helvetica,sans-serif;
+font-size: 10pt;
+margin: 0 4px;
+padding-left: 4px;
+padding-right: 4px;
+}
+a,a:visited {
+text-decoration: underline;
+color: #34345C;
+}
+a:hover,.intro a.post_no:hover {
+color: #ff0000;
+}
+a.post_no {
+text-decoration: none;
+margin: 0;
+padding: 0;
+}
+.intro a.post_no {
+color: inherit;
+}
+.intro time {
+direction: ltr;
+unicode-bidi: embed;
+}
+header {
+margin: 1em 0;
+}
+h1 {
+font-family: tahoma;
+letter-spacing: -2px;
+font-size: 20pt;
+margin: 0;
+}
+header div.subtitle,h1 {
+color: #AF0A0F;
+text-align: center;
+}
+header div.subtitle {
+font-size: 8pt;
+}
+form {
+margin-bottom: 4em;
+}
+form table {
+margin: auto;
+}
+form table input {
+height: auto;
+}
+input[type="text"],textarea {
+border: 1px solid #a9a9a9;
+text-indent: 0;
+text-shadow: none;
+text-transform: none;
+word-spacing: normal;
+max-width: 100%;
+}
+textarea {
+width: 100%;
+}
+form table tr td {
+text-align: left;
+margin: 0;
+padding: 0;
+}
+form table tr th {
+text-align: left;
+padding: 4px;
+background: #98E;
+}
+.file {
+float: left;
+margin-right: 2px;
+}
+p.fileinfo {
+display: block;
+margin: 0 0 0 20px;
+}
+div.post p.fileinfo {
+padding-left: 5px;
+}
+div.banner {
+background-color: #E04000;
+font-size: 12pt;
+font-weight: bold;
+text-align: center;
+margin: 1em 0;
+}
+div.banner,div.banner a {
+color: white;
+}
+div.banner a:hover {
+color: #EEF2FF;
+text-decoration: none;
+}
+.post-image {
+display: block;
+float: left;
+margin: 5px 20px 10px 20px;
+border: none;
+}
+div.post .post-image {
+padding: 5px;
+margin: 0 20px 0 0;
+}
+div.post.op {
+margin-right: 20px;
+margin-bottom: 5px;
+}
+.intro {
+margin: 0.5em 0;
+padding: 0;
+padding-bottom: 0.2em;
+}
+.intro span.subject {
+color: #0F0C5D;
+font-weight: bold;
+}
+.intro span.name {
+color: #117743;
+font-weight: bold;
+}
+.intro a {
+margin-left: 8px;
+}
+div.post.reply div.body {
+margin-left: 1.8em;
+margin-top: 0.8em;
+padding-right: 3em;
+padding-bottom: 0.3em;
+}
+div.post.reply div.body a {
+color: #D00;
+}
+div.post {
+padding-left: 20px;
+clear: both;
+}
+div.post div.body {
+word-wrap: break-word;
+white-space: pre-wrap;
+}
+div.post.reply {
+background: #D6DAF0;
+margin: 0.2em 4px;
+padding: 0.2em 0.3em 0.5em 0.6em;
+border-width: 1px;
+border-style: none solid solid none;
+border-color: #B7C5D9;
+display: block;
+max-width: 100%;
+}
+span.quote {
+color: #789922;
+}
+span.omitted {
+display: block;
+margin-top: 1em;
+}
+br.clear {
+clear: left;
+display: block;
+}
+hr {
+border: none;
+border-top: 1px solid #B7C5D9;
+height: 0;
+clear: left;
+}
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+    font-family: arial, helvetica, sans-serif;
+    font-size: 12pt;
+}
+
+.pagination a,
+.pagination span {
+    margin: 0 6px;
+    padding: 8px 14px;
+    text-decoration: none;
+    color: #34345C; /* Matches your link color */
+    border: 1px solid #B7C5D9; /* Matches your border color */
+    border-radius: 6px;
+    background-color: #EEF2FF; /* Matches your body background */
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination a:hover {
+    background-color: #D6DAF0; /* Matches your reply background */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    color: #AF0A0F; /* Matches your header color for hover */
+}
+
+.pagination .current {
+    background-color: #98E; /* Matches your form th background */
+    color: white;
+    border-color: #98E;
+    font-weight: bold;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pagination span:not(.current) { /* For ellipses */
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: #999;
+}

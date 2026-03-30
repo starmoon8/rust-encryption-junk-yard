@@ -1,0 +1,11 @@
+[package]
+name = "ib"
+version = "0.1.0"
+edition = "2021"  # Keeping 2021 for broad compatibility; change to 2024 if your Rust version supports it
+
+[dependencies]
+axum = { version = "0.7", features = ["multipart"] }
+tokio = { version = "1", features = ["full"] }
+html-escape = "0.2"
+serde = { version = "1", features = ["derive"] }
+tower-http = { version = "0.5", features = ["fs"] }
