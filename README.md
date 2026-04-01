@@ -1,1 +1,1 @@
-By design, all of the code in here works and is incredibly easy to feed to ai in order to change or audit. Ai and i made every line during countless nights and days and weeks and months. Any of the code in this repo serves as reference, a jump start, complete app solutions and more. 
+By design, all of the code in here works and is incredibly easy to feed to ai in order to change or audit. Use it for starter apps, spare parts, or complete apps. Just make sure you have ai audit anything you use. 
